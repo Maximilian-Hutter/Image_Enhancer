@@ -54,17 +54,15 @@ class ResNet50Layer(nn.Module):
         super(ResNet50Layer,self).__init__()
 
         print(first_block)
-        if first_block == 1:
-            self.conv1 = nn.Conv2d(in_features, filters,1)
-        else:
-            self.conv1 = nn.Conv2d(filters, filters, 1)
 
-        if last_block == 1:
+        self.conv1 = nn.Conv2d(filters, filters, 1)
+
+        if last_block != 1:
             self.conv3 = nn.Conv2d(filters, out_features, 1)
         else:
             self.conv3 = nn.Conv2d(filters, filters,1)
 
-        if first_block:
+        if first_block != 1:
             self.conv2 = nn.Conv2d(filters, filters, 3, stride=2)
         else:
             self.conv2 = nn.Conv2d(filters, filters, 3, stride=1)
@@ -85,9 +83,12 @@ class ResNet50SmallBlock(nn.Module):
 
         Layers = []
         if first_block:
-            Layers.append(ResNet50Layer(in_features, out_features, filters, first_block, last_block))
-            Layers.append(ResNet50Layer(in_features, out_features, filters,first_block, last_block))  
-        else:  
+            Layers.append(ResNet50Layer(in_features, out_features, filters, first_block=1, last_block=0))
+            Layers.append(ResNet50Layer(in_features, out_features, filters,first_block=0, last_block=0))  
+        elif last_block:
+            Layers.append(ResNet50Layer(in_features, out_features, filters,first_block, last_block=0))
+            Layers.append(ResNet50Layer(in_features, out_features, filters,first_block, last_block=1))
+        else:
             Layers.append(ResNet50Layer(in_features, out_features, filters,first_block, last_block))
             Layers.append(ResNet50Layer(in_features, out_features, filters,first_block, last_block))
 
@@ -96,6 +97,8 @@ class ResNet50SmallBlock(nn.Module):
     def forward(self, x):
         res = x
         out = self.block(x)
+        print(out.shape)
+        print(res.shape)
         torch.cat((out,res),0)
 
         return out
@@ -108,7 +111,7 @@ class ResNet50Block(nn.Module):
         for i in range(blocksnum):
             if i == 0:
                 Layers.append(ResNet50SmallBlock(in_features, out_features, filters, first_block=1))
-            elif i == blocksnum:
+            elif i == (blocksnum-1):
                 Layers.append(ResNet50SmallBlock(in_features, out_features, filters, last_block = 1))
             else:
                 Layers.append(ResNet50SmallBlock(in_features, out_features, filters))
@@ -198,7 +201,8 @@ class NeuralNet(nn.Module):
     def __init__(self, in_features, activation_function):
         super(NeuralNet,self).__init__()
 
-        self.block1 = ResNet50Block(in_features, 512, 512, 3)
+        self.preconv = ConvBlock(in_features, 512, "ReLU", padding=0)
+        self.block1 = ResNet50Block(512, 512, 512, 3)
         self.block2 = ResNet50Block(512, 256, 256, 6)
         self.block3 = ResNet50Block(256, 128, 128, 4)
         self.block4 = ResNet50Block(128, 64, 64, 3)
@@ -227,6 +231,7 @@ class NeuralNet(nn.Module):
 
     def forward(self,x, lightmap):
 
+        x = self.preconv(x)
         # Res Net Feature Extract
         x, res1 = self.block1(x)
         x, res2 = self.block2(x)

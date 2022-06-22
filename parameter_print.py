@@ -15,8 +15,8 @@ if __name__ == '__main__':
     parser.add_argument('--B_kernel', type=int, default=7, help=("set kernel size for Blue channel"))
     parser.add_argument('--D_kernel', type=int, default=7, help=("set kernel size for Depth channel"))
     parser.add_argument('--activation', type=str, default="PReLU", help=("set activation function"))
-    parser.add_argument('--imgheight', type=int, default=1024, help=("set the height of the image in pixels"))
-    parser.add_argument('--imgwidth', type=int, default=600, help=("set the width of the image in pixels"))
+    parser.add_argument('--imgheight', type=int, default=256, help=("set the height of the image in pixels"))
+    parser.add_argument('--imgwidth', type=int, default=200, help=("set the width of the image in pixels"))
     parser.add_argument('--imgchannels', type=int, default=3, help=("set the channels of the Image (default = RGBD -> 4)"))
     parser.add_argument('--augment_data', type=bool, default=False, help=("if true augment train data"))
     parser.add_argument('--use_patches', type=bool, default=True, help=("if true use cropped parts of trained image"))
@@ -49,7 +49,7 @@ if __name__ == '__main__':
 
     # defining shapes
 
-    Net = NeuralNet(in_features=opt.imgchannels, activation_function=opt.activation).to("cuda:0")
+    Net = NeuralNet(in_features=opt.imgchannels, activation_function=opt.activation)#.to("cuda:0")
 
     summary(Net, [(opt.imgchannels, opt.imgheight, opt.imgwidth), (opt.imgchannels, opt.imgheight, opt.imgwidth)])
 
