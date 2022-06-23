@@ -29,9 +29,9 @@ class ConvBlock(nn.Module):
         
     def forward(self, x):
 
-        out = self.Block(x)
+        x = self.Block(x)
 
-        return out
+        return x
 
 class UpConv(nn.Module):
     def __init__(self, in_features, kernel_size, scale_factor):
@@ -45,9 +45,9 @@ class UpConv(nn.Module):
         self.Block = nn.Sequential(*Layers)
     def forward(self, x):
 
-        out = self.Block(x)
+        x = self.Block(x)
 
-        return out
+        return x
 
 class ResNet50LastLayer(nn.Module):
     def __init__(self, in_features, out_features, filters):
@@ -62,10 +62,10 @@ class ResNet50LastLayer(nn.Module):
 
         x = self.conv1(x)
         x = self.conv2(x)
-        out = self.conv3(x)
-        out = self.norm(out)
+        x = self.conv3(x)
+        x = self.norm(x)
 
-        return out
+        return x
 
 class ResNet50Layer(nn.Module):
     def __init__(self, in_features,filters):
@@ -80,10 +80,10 @@ class ResNet50Layer(nn.Module):
 
         x = self.conv1(x)
         x = self.conv2(x)
-        out = self.conv3(x)
-        out = self.norm(out)
+        x = self.conv3(x)
+        x = self.norm(x)
 
-        return out
+        return x
 
 class ResNet50SmallBlock(nn.Module):
     def __init__(self, in_features, out_features, filters, last_block=0):
