@@ -38,13 +38,14 @@ class UpConv(nn.Module):
         super(UpConv, self).__init__()
 
         Layers = []
-        Layers.append(nn.Upsample(in_features, scale_factor))
-        Layers.append(nn.Conv2d(in_features*2, in_features*2, kernel_size, 1, padding=1,bias=False))
-        Layers.append(nn.Conv2d(in_features*2, in_features*2, kernel_size, 1, padding=1,bias=False))
+        Layers.append(nn.Upsample(scale_factor))
+        Layers.append(nn.Conv2d(in_features, in_features, kernel_size, 1, padding=1,bias=False))
+        Layers.append(nn.Conv2d(in_features, in_features*scale_factor, kernel_size, 1, padding=1,bias=False))
 
         self.Block = nn.Sequential(*Layers)
     def forward(self, x):
 
+        #print(x.shape)
         x = self.Block(x)
 
         return x
@@ -104,12 +105,11 @@ class ResNet50SmallBlock(nn.Module):
     def forward(self, x):
         res = x
         out = self.block(x)
-        print(out.shape)
-        print(res.shape)
+        #print(out.shape)
         if self.last_block:
             res = self.resconv(res)
     
-        out = torch.cat((out,res),0)
+        out = torch.add(out,res)# changes minibatch size to double the previous
 
         return out
 
@@ -135,11 +135,11 @@ class skipBlock(nn.Module):
     def __init__(self, in_feature):
         super(skipBlock, self).__init__()
 
-        self.up = nn.Upsample(in_feature, 2)
-        self.conv1 = nn.Conv2d(in_feature*2,in_feature*2, 3, padding=1)
+        self.up = nn.Upsample(2)
+        self.conv1 = nn.Conv2d(in_feature,in_feature*2, 3, padding=1)
         self.conv2 = nn.Conv2d(in_feature*2, in_feature*2, 3,padding=1)
 
-        self.conv3 = nn.Conv2d(in_feature*2, in_feature*2, 3,padding=1)
+        self.conv3 = nn.Conv2d(in_feature, in_feature*2, 3,padding=2)
 
         self.convout = nn.Conv2d(in_feature*2, in_feature*2, 1)
 
@@ -151,7 +151,9 @@ class skipBlock(nn.Module):
         
         res = self.conv3(res)
 
-        out = torch.cat((x,res),0)
+        print(x.shape)
+        print(res.shape)
+        out = torch.add(x,res)
 
         out = self.convout(out)
 
@@ -206,14 +208,14 @@ class ConvModule(nn.Module):
         return out
 
 class NeuralNet(nn.Module):
-    def __init__(self, in_features, activation_function):
+    def __init__(self, in_features, activation_function, filters):
         super(NeuralNet,self).__init__()
 
         self.preconv = ConvBlock(in_features, 512, "ReLU", padding=0)
-        self.block1 = ResNet50Block(512, 256, 64, 3)
-        self.block2 = ResNet50Block(256, 128, 64, 6)
-        self.block3 = ResNet50Block(128, 64, 64, 4)
-        self.block4 = ResNet50Block(64, 32, 32, 3)
+        self.block1 = ResNet50Block(512, 256, filters, 3)
+        self.block2 = ResNet50Block(256, 128, filters, 6)
+        self.block3 = ResNet50Block(128, 64, filters, 4)
+        self.block4 = ResNet50Block(64, 32, filters, 3)
         self.resconv = nn.Conv2d(32, 16, 7, 2)
         self.norm = nn.InstanceNorm2d(16)
 
@@ -252,10 +254,10 @@ class NeuralNet(nn.Module):
         x = self.convmodule(x)
 
         # decoder
-        x = self.skip(x, res1)
-        x = self.skip2(x, res2)
+        x = self.skip(x, res5)
+        x = self.skip2(x, res4)
         x = self.skip3(x, res3)
-        x = self.skip4(x, res4)
+        x = self.skip4(x, res2)
 
         lightmap = self.dimcorrect(lightmap)
         lightmap = self.up(lightmap)
@@ -264,7 +266,7 @@ class NeuralNet(nn.Module):
         #lightmap = self.up3(lightmap)
 
         out = self.LAM(lightmap, x)
-        out = self.skip5(out, res5)
+        out = self.skip5(out, res1)
         out = self.shuffle(out)
 
         return out
