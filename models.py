@@ -49,57 +49,67 @@ class UpConv(nn.Module):
 
         return out
 
+class ResNet50LastLayer(nn.Module):
+    def __init__(self, in_features, out_features, filters):
+        super(ResNet50LastLayer, self).__init__()
+
+        self.conv1 = nn.Conv2d(in_features, filters, 1)
+        self.conv2 = nn.Conv2d(filters, filters,3, padding=1)
+        self.conv3 = nn.Conv2d(filters, out_features, 1, stride=2)    
+        self.norm = nn.InstanceNorm2d(out_features)
+
+    def forward(self,x):
+
+        x = self.conv1(x)
+        x = self.conv2(x)
+        out = self.conv3(x)
+        out = self.norm(out)
+
+        return out
+
 class ResNet50Layer(nn.Module):
-    def __init__(self, in_features, filters, out_features, first_block=0, last_block=0):
+    def __init__(self, in_features,filters):
         super(ResNet50Layer,self).__init__()
 
-        print(first_block)
-
-        self.conv1 = nn.Conv2d(filters, filters, 1)
-
-        if last_block != 1:
-            self.conv3 = nn.Conv2d(filters, out_features, 1)
-        else:
-            self.conv3 = nn.Conv2d(filters, filters,1)
-
-        if first_block != 1:
-            self.conv2 = nn.Conv2d(filters, filters, 3, stride=2)
-        else:
-            self.conv2 = nn.Conv2d(filters, filters, 3, stride=1)
-        
-        self.norm = nn.InstanceNorm2d(filters)
+        self.conv1 = nn.Conv2d(in_features, filters, 1)
+        self.conv2 = nn.Conv2d(filters,filters,3,padding=1)
+        self.conv3 = nn.Conv2d(filters, in_features, 1)
+        self.norm = nn.InstanceNorm2d(in_features)
 
     def forward(self, x):
 
         x = self.conv1(x)
         x = self.conv2(x)
         out = self.conv3(x)
+        out = self.norm(out)
 
         return out
 
 class ResNet50SmallBlock(nn.Module):
-    def __init__(self, in_features, out_features, filters, first_block=0, last_block=0):
+    def __init__(self, in_features, out_features, filters, last_block=0):
         super(ResNet50SmallBlock, self).__init__()
 
         Layers = []
-        if first_block:
-            Layers.append(ResNet50Layer(in_features, out_features, filters, first_block=1, last_block=0))
-            Layers.append(ResNet50Layer(in_features, out_features, filters,first_block=0, last_block=0))  
-        elif last_block:
-            Layers.append(ResNet50Layer(in_features, out_features, filters,first_block, last_block=0))
-            Layers.append(ResNet50Layer(in_features, out_features, filters,first_block, last_block=1))
+        self.last_block = last_block
+        if last_block:
+            Layers.append(ResNet50Layer(in_features, filters))
+            Layers.append(ResNet50LastLayer(in_features, out_features, filters))
         else:
-            Layers.append(ResNet50Layer(in_features, out_features, filters,first_block, last_block))
-            Layers.append(ResNet50Layer(in_features, out_features, filters,first_block, last_block))
+            Layers.append(ResNet50Layer(in_features, filters))
+            Layers.append(ResNet50Layer(in_features, filters))
 
         self.block = nn.Sequential(*Layers)
+        self.resconv = ResNet50LastLayer(in_features, out_features, filters)
 
     def forward(self, x):
         res = x
         out = self.block(x)
         print(out.shape)
         print(res.shape)
-        torch.cat((out,res),0)
+        if self.last_block:
+            res = self.resconv(res)
+    
+        out = torch.cat((out,res),0)
 
         return out
 
@@ -109,10 +119,8 @@ class ResNet50Block(nn.Module):
 
         Layers = []
         for i in range(blocksnum):
-            if i == 0:
-                Layers.append(ResNet50SmallBlock(in_features, out_features, filters, first_block=1))
-            elif i == (blocksnum-1):
-                Layers.append(ResNet50SmallBlock(in_features, out_features, filters, last_block = 1))
+            if i == (blocksnum-1):
+                Layers.append(ResNet50SmallBlock(in_features, out_features, filters, last_block=1))
             else:
                 Layers.append(ResNet50SmallBlock(in_features, out_features, filters))
 
@@ -183,10 +191,10 @@ class ConvModule(nn.Module):
     def __init__(self, in_features):
         super(ConvModule,self).__init__()
 
-        self.conv1 = nn.Conv2d(in_features, 16, 3, stride=2)
-        self.conv2 = nn.Conv2d(16, 8,3, stride=3)
-        self.up1 = UpConv(8, 3, 2)
-        self.up2 = UpConv(16, 3, 2)
+        self.conv1 = nn.Conv2d(in_features, 8, 3, stride=2)
+        self.conv2 = nn.Conv2d(8, 4,3, stride=3)
+        self.up1 = UpConv(4, 3, 2)
+        self.up2 = UpConv(8, 3, 2)
 
     def forward(self, x):
 
@@ -202,19 +210,19 @@ class NeuralNet(nn.Module):
         super(NeuralNet,self).__init__()
 
         self.preconv = ConvBlock(in_features, 512, "ReLU", padding=0)
-        self.block1 = ResNet50Block(512, 512, 512, 3)
-        self.block2 = ResNet50Block(512, 256, 256, 6)
-        self.block3 = ResNet50Block(256, 128, 128, 4)
-        self.block4 = ResNet50Block(128, 64, 64, 3)
-        self.resconv = nn.Conv2d(64, 32, 7, 2)
-        self.norm = nn.InstanceNorm2d(32)
+        self.block1 = ResNet50Block(512, 256, 64, 3)
+        self.block2 = ResNet50Block(256, 128, 64, 6)
+        self.block3 = ResNet50Block(128, 64, 64, 4)
+        self.block4 = ResNet50Block(64, 32, 32, 3)
+        self.resconv = nn.Conv2d(32, 16, 7, 2)
+        self.norm = nn.InstanceNorm2d(16)
 
-        self.convmodule = ConvModule(32)
+        self.convmodule = ConvModule(16)
         
-        self.skip = skipBlock(32)
-        self.skip2 = skipBlock(64)
-        self.skip3 = skipBlock(128)
-        self.skip4 = skipBlock(256)
+        self.skip = skipBlock(16)
+        self.skip2 = skipBlock(32)
+        self.skip3 = skipBlock(64)
+        self.skip4 = skipBlock(128)
         
 
         
@@ -226,8 +234,8 @@ class NeuralNet(nn.Module):
         self.conv = ConvBlock(128,128,activation_function)
         self.up2 = UpConv(128, 3, 2)
 
-        self.skip5 = skipBlock(512)
-        self.shuffle = nn.PixelShuffle((in_features / 512))
+        self.skip5 = skipBlock(256)
+        self.shuffle = nn.PixelShuffle((in_features / 256))
 
     def forward(self,x, lightmap):
 
