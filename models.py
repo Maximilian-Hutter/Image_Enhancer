@@ -8,11 +8,11 @@ from einops import rearrange
 from data_augmentation import lightmap_gen
 
 class ConvBlock(nn.Module):
-    def __init__(self, in_features, out_features, activation_function, padding=1):
+    def __init__(self, in_features, out_features, activation_function, padding=1, stride=1):
         super(ConvBlock, self).__init__()
 
         Layers = []
-        Layers.append(nn.Conv2d(in_features, out_features, 3, padding=padding, bias=False)) # set bias true if result is not good
+        Layers.append(nn.Conv2d(in_features, out_features, 3,stride=stride, padding=padding, bias=False)) # set bias true if result is not good
         if activation_function == "ReLU":
             Layers.append(nn.ReLU())
         if activation_function == "PReLU":
@@ -145,14 +145,14 @@ class skipBlock(nn.Module):
 
     def forward(self, x, res):
 
+        print(x.shape)
         x = self.up(x)
+        print(x.shape)
         x = self.conv1(x)
         x = self.conv2(x)
         
-        print(x.shape)
-        print(res.shape)
-
         res = self.conv3(res)
+        print(x.shape)
         print(res.shape)
         out = torch.add(x,res)
 
@@ -161,34 +161,46 @@ class skipBlock(nn.Module):
         return out
 
 class LightAttentionModule(nn.Module):
-    def __init__(self,in_features, activation_function):
+    def __init__(self,in_features, out_features, filters, activation_function):
         super(LightAttentionModule, self).__init__()
 
-        self.conv1 = ConvBlock(in_features, in_features, activation_function, 3)
-        self.conv2 = ConvBlock(in_features, in_features, activation_function, 3)
-        self.sigmoid = nn.Sigmoid()
+        self.lightmap = LightMapAttention(in_features, filters, filters, activation_function)
 
-        self.conv3 = ConvBlock(in_features, in_features, activation_function, 3)
+        self.conv3 = ConvBlock(in_features, filters, activation_function)
 
-        self.conv4 = ConvBlock(in_features, in_features, activation_function, 3)
-        self.up = UpConv(in_features,3,2)
-        self.conv5 = ConvBlock(in_features*2, in_features, activation_function, 3)
+        self.conv4 = ConvBlock(filters, filters, activation_function, stride=2)
+        self.up = UpConv(filters,out_features,2)
+        self.conv5 = ConvBlock(out_features, out_features, activation_function)
 
     def forward(self, x, y):
 
-        x = self.conv1(x)
-        x = self.conv2(x)
-        x = self.sigmoid(x)
+        x = self.lightmap(x)
 
-        y = self.conv3(x)
+        y = self.conv3(y)
 
-        x = torch.cat((x,y),0)
+        out = torch.mul(x,y)
 
         out = self.conv4(x)
         out = self.up(out)
         out = self.conv5(out)
 
         return out
+
+class LightMapAttention(nn.Module):
+    def __init__(self, in_features, out_features, filters, activation_function):
+        super(LightMapAttention, self).__init__()
+
+        self.conv1 = ConvBlock(in_features, filters, activation_function)
+        self.conv2 = ConvBlock(filters, out_features, activation_function)
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x):
+
+        x = self.conv1(x)
+        x = self.conv2(x)
+        x = self.sigmoid(x)
+
+        return x
 
 class ConvModule(nn.Module):
     def __init__(self, in_features):
@@ -208,6 +220,19 @@ class ConvModule(nn.Module):
 
         return out
 
+class LightmapPath(nn.Module):
+    def __init__(self, in_features, out_features,filter, activation_function):
+        super(LightmapPath, self).__init__()
+
+        # WIP
+        self.conv = nn.Conv2d(in_features, out_features, 3, padding=1)
+
+    def forward(self, x):
+
+        x = self.conv(x)
+
+        return x
+
 class NeuralNet(nn.Module):
     def __init__(self, in_features, activation_function, filters):
         super(NeuralNet,self).__init__()
@@ -226,19 +251,12 @@ class NeuralNet(nn.Module):
         self.skip2 = skipBlock(256, 128)
         self.skip3 = skipBlock(128, 64)
         self.skip4 = skipBlock(64, 64)
-        
 
-        
-        #self.up3 = UpConv()
+        self.lightmappath = LightmapPath(3, 64, filters, activation_function)
 
-        self.LAM = LightAttentionModule(in_features, activation_function)
-        #self.dimcorrect = DimensionalityCorrection()
-        self.up = UpConv(64, 3, 2)
-        self.conv = ConvBlock(128,128,activation_function)
-        self.up2 = UpConv(128, 3, 2)
-
+        self.LAM = LightAttentionModule(64,64,filters,  activation_function)
+        self.upsample = UpConv(in_features, in_features, scale_factor=2)
         self.skip5 = skipBlock(64, 3)
-        self.shuffle = nn.PixelShuffle(in_features)
 
     def forward(self,x, lightmap):
 
@@ -270,18 +288,15 @@ class NeuralNet(nn.Module):
         #print(res5.shape)
         x = self.skip(x, res3)
         x = self.skip2(x, res2)
+        
+
+        lightmap = self.lightmappath(lightmap)
+
         x = self.skip3(x, res1)
         x = self.skip4(x, res0)
-
-        lightmap = self.dimcorrect(lightmap)
-        lightmap = self.up(lightmap)
-        lightmap = self.conv(lightmap)
-        lightmap = self.up2(lightmap)
-        #lightmap = self.up3(lightmap)
-
         out = self.LAM(lightmap, x)
+        res = self.upsample(res)
         out = self.skip5(out, res)
-        out = self.shuffle(out)
 
         return out
 
