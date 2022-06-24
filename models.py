@@ -145,15 +145,15 @@ class skipBlock(nn.Module):
 
     def forward(self, x, res):
 
-        print(x.shape)
+       # print(x.shape)
         x = self.up(x)
-        print(x.shape)
+        #print(x.shape)
         x = self.conv1(x)
         x = self.conv2(x)
         
         res = self.conv3(res)
-        print(x.shape)
-        print(res.shape)
+        #print(x.shape)
+        #print(res.shape)
         out = torch.add(x,res)
 
         out = self.convout(out)
@@ -215,9 +215,11 @@ class ConvModule(nn.Module):
 
         x = self.conv1(x)
         x = self.conv2(x)
+        #print(x.shape)
         x = self.up1(x)
+        #print(x.shape)
         out = self.up2(x)
-
+        #print(out.shape)
         return out
 
 class LightmapPath(nn.Module):
@@ -283,6 +285,7 @@ class NeuralNet(nn.Module):
         # Lowest point in U net
         x = self.convmodule(x)
 
+        #print(x.shape)
         # decoder
         #print("res:")
         #print(res5.shape)

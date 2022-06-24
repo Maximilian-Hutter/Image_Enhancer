@@ -7,6 +7,7 @@ import os
 import numpy as np
 from data_augmentation import *
 import torchvision
+import torchvision.transforms as transforms
 
 class ImageDataset(Dataset):
     def __init__(self, root, augmentation=0):
@@ -20,9 +21,25 @@ class ImageDataset(Dataset):
         #img = Image.open(self.imgs[index % len(self.recovered)])
         label = Image.open(self.label[index % len(self.label)])
 
+        SIZE = 896
+        SMALL_SIZE = SIZE / 2
+        SMALL_SIZE = int(SMALL_SIZE)
+
+        label = label.resize((SIZE,SIZE))
+
+        transform = transforms.Compose([
+        transforms.PILToTensor()
+        ])
+
         img = create_input(label)
         lightmap = lightmap_gen(img)
 
+        img = img.resize((SMALL_SIZE,SMALL_SIZE))
+        lightmap = lightmap.resize((SMALL_SIZE,SMALL_SIZE))
+        img = transform(img)
+        lightmap = transform(lightmap)
+        label = transform(label)
+        
         imgs = {"img": img,"lightmap":lightmap, "label": label}   # create imgs dictionary
 
         return imgs

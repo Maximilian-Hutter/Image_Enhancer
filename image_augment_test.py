@@ -3,7 +3,7 @@ import torch
 from torchvision.transforms.functional import *
 import torchvision.transforms
 
-img = Image.open("C:/Users/Redmi/Downloads/test.jpg")
+img = Image.open("C:/Data/DIV2K_train_HR/DIV2K_train_HR/0022.png")
 img.show()
 
 def color_extract(img):
@@ -22,6 +22,7 @@ def create_input(img):
     img = colorjitter(img)
     img = blur(img)
     img = adjust_saturation(img,0.8)
+    img =autocontrast(img)
     return img
 
 #lightmap = color_extract(img)

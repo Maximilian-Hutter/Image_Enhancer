@@ -20,7 +20,7 @@ if __name__ == '__main__':
     parser.add_argument('--imgchannels', type=int, default=3, help=("set the channels of the Image (default = RGBD -> 4)"))
     parser.add_argument('--augment_data', type=bool, default=False, help=("if true augment train data"))
     parser.add_argument('--use_patches', type=bool, default=True, help=("if true use cropped parts of trained image"))
-    parser.add_argument('--batchsize', type=int, default=4, help=("set batch Size"))
+    parser.add_argument('--batchsize', type=int, default=1, help=("set batch Size"))
     parser.add_argument('--gpu_mode', type=bool, default=True) 
     parser.add_argument('--threads', type=int, default=0, help='number of threads for data loader to use')
     parser.add_argument('--seed', type=int, default=123, help='random seed to use. Default=123')
@@ -49,7 +49,7 @@ if __name__ == '__main__':
 
     # defining shapes
 
-    Net = NeuralNet(in_features=opt.imgchannels, activation_function=opt.activation, filters=opt.filters)#.to("cuda:0")
+    Net = NeuralNet(in_features=opt.imgchannels, activation_function=opt.activation, filters=opt.filters).to("cuda:0")
 
     summary(Net, [(opt.imgchannels, opt.imgheight, opt.imgwidth), (opt.imgchannels, opt.imgheight, opt.imgwidth)])
 
