@@ -21,7 +21,7 @@ class ImageDataset(Dataset):
         label = Image.open(self.label[index % len(self.label)])
 
         img = create_input(label)
-        lightmap = lightmap_gen(label)
+        lightmap = lightmap_gen(img)
 
         imgs = {"img": img,"lightmap":lightmap, "label": label}   # create imgs dictionary
 

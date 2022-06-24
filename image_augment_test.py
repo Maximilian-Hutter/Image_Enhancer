@@ -26,7 +26,8 @@ def create_input(img):
 
 #lightmap = color_extract(img)
 #lightmap.show()
-lightmap = color_extract(img)
-lightmap.show()
+
 img = create_input(img)
 img.show()
+lightmap = color_extract(img)
+lightmap.show()
