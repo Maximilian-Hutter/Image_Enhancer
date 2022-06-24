@@ -36,7 +36,7 @@ if __name__ == '__main__':
     parser.add_argument('--Unet', type=bool, default=False, help="set if using U-Net structure")
     parser.add_argument('--stride', type=int, default=1, help="set stride of CBAM")
     parser.add_argument('--padding', type=int, default=1, help="set padding of CBAM")
-    parser.add_argument('--filters', type=int, default=32, help="set number of filters")
+    parser.add_argument('--filters', type=int, default=64, help="set number of filters")
 
     parser.add_argument
     opt = parser.parse_args()

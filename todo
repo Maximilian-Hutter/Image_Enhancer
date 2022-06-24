@@ -1,0 +1,2 @@
+fix the res/x torch.add dim error on different resolutions in models.py
+put the lightmap generation in the neural net

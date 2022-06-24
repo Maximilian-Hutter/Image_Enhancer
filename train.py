@@ -14,6 +14,7 @@ from torch.autograd import Variable
 import itertools
 import os
 import logging
+from data_augmentation import lightmap_gen
 
 # import own dataset
 from get_data import ImageDataset
@@ -22,37 +23,28 @@ from models import NeuralNet
 # replace Contrast_expander with the final name
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='PyTorch dummmyname')
+    parser = argparse.ArgumentParser(description='PyTorch HDRnet')
     parser.add_argument('--ray_tune', type=bool, default=False, help=("Use ray tune to tune parameters"))
     parser.add_argument('--train_data_path', type=str, help=("path for the data"))
-    parser.add_argument('--R_kernel', type=int, default=3, help=("set kernel size for Red channel"))
-    parser.add_argument('--G_kernel', type=int, default=5, help=("set kernel size for Green channel"))
-    parser.add_argument('--B_kernel', type=int, default=7, help=("set kernel size for Blue channel"))
-    parser.add_argument('--D_kernel', type=int, default=7, help=("set kernel size for Depth channel"))
     parser.add_argument('--activation', type=str, default="PReLU", help=("set activation function"))
-    parser.add_argument('--imgheight', type=int, default=1944, help=("set the height of the image in pixels"))
-    parser.add_argument('--imgwidth', type=int, default=2592, help=("set the width of the image in pixels"))
-    parser.add_argument('--imgchannels', type=int, default=4, help=("set the channels of the Image (default = RGBD -> 4)"))
+    parser.add_argument('--imgheight', type=int, default=448, help=("set the height of the image in pixels"))
+    parser.add_argument('--imgwidth', type=int, default=448, help=("set the width of the image in pixels"))
+    parser.add_argument('--imgchannels', type=int, default=3, help=("set the channels of the Image (default = RGBD -> 4)"))
     parser.add_argument('--augment_data', type=bool, default=False, help=("if true augment train data"))
-    parser.add_argument('--use_patches', type=bool, default=True, help=("if true use cropped parts of trained image"))
     parser.add_argument('--batchsize', type=int, default=4, help=("set batch Size"))
     parser.add_argument('--gpu_mode', type=bool, default=True) 
     parser.add_argument('--threads', type=int, default=0, help='number of threads for data loader to use')
     parser.add_argument('--seed', type=int, default=123, help='random seed to use. Default=123')
     parser.add_argument('--save_folder', default='weights/', help='Location to save checkpoint models')
-    parser.add_argument('--disc_save_folder',type=str, default='weights/', help='Location to save Discriminator')
     parser.add_argument('--mini_batch',type=int, default=16, help='mini batch size')
     parser.add_argument('--sample_interval',type=int, default=100, help='Number of epochs for learning rate decay')
     parser.add_argument('--resume',type=bool, default=False, help='resume training/ load checkpoint')
+    parser.add_argument('--model_type', type=str, default="HDR", help="set type of model")
+    parser.add_argument('--filters', type=int, default=64, help="set number of filters")
     parser.add_argument('--beta1',type=float, default=0.9, help='decay of first order momentum of gradient')
     parser.add_argument('--beta2',type=float, default=0.999, help='decay of first order momentum of gradient')
-    parser.add_argument('--model_type', type=str, default="Contrast_expander", help="set type of model")
-    parser.add_argument('--net_depth', type=int, default=None, help="set the U-Net depth of the Network")
-    parser.add_argument('--Unet', type=bool, default=False, help="set if using U-Net structure")
-    parser.add_argument('--stride', type=int, default=1, help="set stride of CBAM")
-    parser.add_argument('--padding', type=int, default=1, help="set padding of CBAM")
-    parser.add_argument('--filters', type=int, default=8, help="set number of filters")
     parser.add_argument('--gpus', type=int, default=1, help='number of gpus')
+    parser.add_argument('--nEpochs', type=int, default=100, help='number of epochs')
 
     parser.add_argument
     opt = parser.parse_args()
@@ -64,17 +56,14 @@ if __name__ == '__main__':
     cudnn.benchmark = True
     print(opt)  # print the chosen parameters
 
-    # defining shapes
-    imgshape = (opt.imgchannels, opt.imgheight, opt.imgwidth)
-
     # dataloader
     print('==> Loading Datasets')
-    dataloader = DataLoader(ImageDataset(opt.train_data_path, opt.use_patches, opt.augment_data), batch_size=opt.batchSize, shuffle=True, num_workers=opt.threads)
+    dataloader = DataLoader(ImageDataset(opt.train_data_path, opt.augment_data), batch_size=opt.batchSize, shuffle=True, num_workers=opt.threads)
 
     # instantiate model
 
     #Generator = ESRGANplus(opt.channels, filters=opt.filters,hr_shape=hr_shape, n_resblock = opt.n_resblock, upsample = opt.upsample)
-    Net = NeuralNet(in_features=opt.imgchannels, filters=opt.filters, stride=opt.stride, padding=opt.padding,depth=opt.net_depth, U_Net=opt.Unet, activation_function=opt.activation)
+    Net = NeuralNet(in_features=opt.imgchannels,activation_function=opt.activation, filters=opt.filters)
 
     #parameters
     pytorch_params = sum(p.numel() for p in Net.parameters())
@@ -128,24 +117,22 @@ if __name__ == '__main__':
         for i, imgs in enumerate(BackgroundGenerator(dataloader,1)):
 
             img = Variable(imgs["img"].type(Tensor))
-            recovered = Variable(imgs["recovered"].type(Tensor))
-            depth = Variable(imgs["depth"].type(Tensor))    # merge depth and image to RGBD form
+            lightmap = Variable(imgs["lightmap"].type(Tensor))
+            label = Variable(imgs["label"].type(Tensor))    # merge depth and image to RGBD form
 
             if cuda:    # put variables to gpu
                 img = img.to(gpus_list[0])
-                recovered = recovered.to(gpus_list[0])
-                depth = depth.to(gpus_list[0])
-
-            img = torch.cat((img, depth),0) # in der ersten dimension depth anhängen
+                lightmap = lightmap.to(gpus_list[0])
+                label = label.to(gpus_list[0])
 
             prepare_time = time.time() - start_time
 
             # start train
             optimizer.zero_grad()
 
-            generated_image = Net(img)
+            generated_image = Net(img, lightmap)
 
-            Loss = loss(generated_image, recovered)
+            Loss = loss(generated_image, label)
             epoch_loss += Loss.data
 
             Loss.backward()
