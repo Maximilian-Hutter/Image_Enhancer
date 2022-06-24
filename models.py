@@ -38,9 +38,8 @@ class UpConv(nn.Module):
         super(UpConv, self).__init__()
 
         Layers = []
-        Layers.append(nn.Upsample(scale_factor))
-        Layers.append(nn.Conv2d(in_features, in_features, kernel_size, 1, padding=1,bias=False))
-        Layers.append(nn.Conv2d(in_features, in_features*scale_factor, kernel_size, 1, padding=1,bias=False))
+        Layers.append(nn.Upsample(scale_factor = scale_factor))
+        Layers.append(nn.Conv2d(in_features, in_features*scale_factor, kernel_size, 1, padding=1))
 
         self.Block = nn.Sequential(*Layers)
     def forward(self, x):
@@ -135,11 +134,11 @@ class skipBlock(nn.Module):
     def __init__(self, in_feature):
         super(skipBlock, self).__init__()
 
-        self.up = nn.Upsample(2)
+        self.up = nn.Upsample(scale_factor=2)
         self.conv1 = nn.Conv2d(in_feature,in_feature*2, 3, padding=1)
         self.conv2 = nn.Conv2d(in_feature*2, in_feature*2, 3,padding=1)
 
-        self.conv3 = nn.Conv2d(in_feature, in_feature*2, 3,padding=2)
+        self.conv3 = nn.Conv2d(in_feature, in_feature*2, 3,padding=1)
 
         self.convout = nn.Conv2d(in_feature*2, in_feature*2, 1)
 
@@ -149,10 +148,10 @@ class skipBlock(nn.Module):
         x = self.conv1(x)
         x = self.conv2(x)
         
+        #print(x.shape)
+        #print(res.shape)
         res = self.conv3(res)
-
-        print(x.shape)
-        print(res.shape)
+        #print(res.shape)
         out = torch.add(x,res)
 
         out = self.convout(out)
@@ -200,10 +199,13 @@ class ConvModule(nn.Module):
 
     def forward(self, x):
 
+        #print(x.shape)
         x = self.conv1(x)
         x = self.conv2(x)
+        #print(x.shape)
         x = self.up1(x)
         out = self.up2(x)
+        #print(x.shape)
 
         return out
 
@@ -211,12 +213,12 @@ class NeuralNet(nn.Module):
     def __init__(self, in_features, activation_function, filters):
         super(NeuralNet,self).__init__()
 
-        self.preconv = ConvBlock(in_features, 512, "ReLU", padding=0)
-        self.block1 = ResNet50Block(512, 256, filters, 3)
-        self.block2 = ResNet50Block(256, 128, filters, 6)
-        self.block3 = ResNet50Block(128, 64, filters, 4)
-        self.block4 = ResNet50Block(64, 32, filters, 3)
-        self.resconv = nn.Conv2d(32, 16, 7, 2)
+        self.preconv = nn.Conv2d(in_features, 64, 7, padding=1)
+        self.block1 = ResNet50Block(64, 64, filters, 3)
+        self.block2 = ResNet50Block(64, 128, filters, 4)
+        self.block3 = ResNet50Block(128, 256, filters, 6)
+        self.block4 = ResNet50Block(256, 512, filters, 3)
+        #self.resconv = nn.Conv2d(32, 16, 3, stride=2)
         self.norm = nn.InstanceNorm2d(16)
 
         self.convmodule = ConvModule(16)
@@ -242,18 +244,27 @@ class NeuralNet(nn.Module):
     def forward(self,x, lightmap):
 
         x = self.preconv(x)
+        res5 = x
         # Res Net Feature Extract
         x, res1 = self.block1(x)
+        print(x.shape)
         x, res2 = self.block2(x)
+        print(x.shape)
         x, res3 = self.block3(x)
+        print(x.shape)
         x, res4 = self.block4(x)
-        x = self.resconv(x)
-        res5 = x
+        print(x.shape)
+        #x = self.resconv(x)
+        #res5 = x
+        print(x.shape)
+        print(res5.shape)
         x = self.norm(x)
         # Lowest point in U net
         x = self.convmodule(x)
 
         # decoder
+        #print("res:")
+        #print(res5.shape)
         x = self.skip(x, res5)
         x = self.skip2(x, res4)
         x = self.skip3(x, res3)
