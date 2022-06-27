@@ -24,14 +24,14 @@ class ImageDataset(Dataset):
         label = Image.open(self.label[index % len(self.label)])
         image = Image.open(self.image[index % len(self.image)])
         alignratio = np.load(self.aligns[index % len(self.aligns)]).astype(np.float32)
-        label = util.read_imgdata(self.label[index % len(self.label)], ratio=alignratio)
+        #label = util.read_imgdata(self.label[index % len(self.label)], ratio=alignratio)
 
         SIZE = 896
         SMALL_SIZE = SIZE / 2
         SMALL_SIZE = int(SMALL_SIZE)
 
         label = label.resize((SIZE,SIZE))
-        img = image.resize((SMALL_SIZE))
+        img = image.resize((SMALL_SIZE, SMALL_SIZE))
         
         transform = transforms.Compose([
         transforms.PILToTensor()

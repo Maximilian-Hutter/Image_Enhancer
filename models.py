@@ -254,7 +254,7 @@ class NeuralNet(nn.Module):
         self.skip3 = skipBlock(128, 64)
         self.skip4 = skipBlock(64, 64)
 
-        self.lightmappath = LightmapPath(3, 64, filters, activation_function)
+        self.lightmappath = LightmapPath(1, 64, filters, activation_function)
 
         self.LAM = LightAttentionModule(64,64,filters,  activation_function)
         self.upsample = UpConv(in_features, in_features, scale_factor=2)

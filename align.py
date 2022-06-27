@@ -3,7 +3,7 @@ from time import sleep
 from PIL import Image
 import numpy as np
 import torch.utils.data as data
-import data.util as util
+import cv2
 
 path ="D:/Data/NTIRE/"
 
