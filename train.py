@@ -15,6 +15,7 @@ import itertools
 import os
 import logging
 from data_augmentation import lightmap_gen
+from criterion import luminance_criterion, abs_criterion
 
 # import own dataset
 from get_data import ImageDataset
@@ -47,7 +48,7 @@ if __name__ == '__main__':
     parser.add_argument('--nEpochs', type=int, default=100, help='number of epochs')
     parser.add_argument('--lr', type=float, default=0.0004, help="learning rate")
     parser.add_argument('--snapshots', type=int, default=10, help="number of epochs until a checkpoint is made")
-
+    parser.add_argument('--loss_weight', type=float, default=1, help="set weight for loss addition")
     parser.add_argument
     opt = parser.parse_args()
     np.random.seed(opt.seed)    # set seed to default 123 or opt
@@ -73,7 +74,8 @@ if __name__ == '__main__':
 
     # loss
     #adverserial_criterion = torch.nn.BCEWithLogitsLoss()
-    loss = MSELoss()
+    abs_crit = abs_criterion()
+    lum_crit = luminance_criterion()
 
     # run on gpu
     cuda = opt.gpu_mode
@@ -86,7 +88,8 @@ if __name__ == '__main__':
 
     if cuda:
         Net = Net.cuda(gpus_list[0])
-        loss = loss.cuda(gpus_list[0])
+        abs_crit = abs_crit.cuda(gpus_list[0])
+        lum_crit = lum_crit.cuda(gpus_list[0])
 
     optimizer = optim.Adam(Net.parameters(), lr=opt.lr, betas=(opt.beta1, opt.beta2))
 
@@ -134,9 +137,10 @@ if __name__ == '__main__':
 
             generated_image = Net(img, lightmap)
 
-            Loss = loss(generated_image, label)
-            correct += (generated_image == label).float().sum()
-            
+            lum_loss = lum_crit(generated_image, label)    
+            abs_loss = abs_crit(generated_image, label)        
+            Loss = lum_loss + opt.loss_weight * abs_loss
+            train_acc = torch.sum(generated_image == label)
             epoch_loss += Loss.data
 
             Loss.backward()
@@ -150,9 +154,10 @@ if __name__ == '__main__':
 
         if (epoch+1) % (opt.snapshots) == 0:
             checkpointG(epoch)
-        Accuracy = 100*correct / len(dataloader)
-        writer.add_scalar('loss', Loss)
-        writer.add_scalar('accuracy',Accuracy)
+
+        Accuracy = 100*train_acc / len(dataloader)
+        writer.add_scalar('loss', Loss, epoch)
+        writer.add_scalar('accuracy',Accuracy, epoch)
         print("===> Epoch {} Complete: Avg. loss: {:.4f}".format(epoch, ((epoch_loss/2) / len(dataloader))))
 
     def print_network(net):
@@ -163,7 +168,7 @@ if __name__ == '__main__':
         print('Total number of parameters: %d' % num_params)
 
     print('===> Building Model ', opt.model_type)
-    if opt.model_type == 'Contrast_expander':
+    if opt.model_type == 'HDR':
         Net = Net
 
 

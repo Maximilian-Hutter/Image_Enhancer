@@ -15,23 +15,25 @@ class ImageDataset(Dataset):
         self.augmentation = augmentation
 
         #self.imgs = sorted(glob.glob(root + "/*.*"))
-        self.label = sorted(glob.glob(root + "/*.*"))
+        self.label = sorted(glob.glob(root + "/label/*.*"))
+        self.image = sorted(glob.glob(root + "/input/*.*"))
 
     def __getitem__(self, index):   # get images to dataloader
         #img = Image.open(self.imgs[index % len(self.recovered)])
         label = Image.open(self.label[index % len(self.label)])
+        image = Image.open(self.image[index % len(self.image)])
 
         SIZE = 896
         SMALL_SIZE = SIZE / 2
         SMALL_SIZE = int(SMALL_SIZE)
 
         label = label.resize((SIZE,SIZE))
-
+        img = image.resize((SMALL_SIZE))
+        
         transform = transforms.Compose([
         transforms.PILToTensor()
         ])
 
-        img = create_input(label)
         lightmap = lightmap_gen(img)
 
         img = img.resize((SMALL_SIZE,SMALL_SIZE))
