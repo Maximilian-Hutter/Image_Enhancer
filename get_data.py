@@ -17,11 +17,14 @@ class ImageDataset(Dataset):
         #self.imgs = sorted(glob.glob(root + "/*.*"))
         self.label = sorted(glob.glob(root + "/label/*.*"))
         self.image = sorted(glob.glob(root + "/input/*.*"))
+        self.aligns = sorted(glob.glob(root + "/align/*.*"))
 
     def __getitem__(self, index):   # get images to dataloader
         #img = Image.open(self.imgs[index % len(self.recovered)])
         label = Image.open(self.label[index % len(self.label)])
         image = Image.open(self.image[index % len(self.image)])
+        alignratio = np.load(self.aligns[index % len(self.aligns)]).astype(np.float32)
+        label = util.read_imgdata(self.label[index % len(self.label)], ratio=alignratio)
 
         SIZE = 896
         SMALL_SIZE = SIZE / 2
