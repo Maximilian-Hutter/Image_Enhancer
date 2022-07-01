@@ -138,11 +138,11 @@ if __name__ == '__main__':
             generated_image = Net(img, lightmap)
 
             lum_loss = luminance_criterion(generated_image, label)    
-            abs_loss = abs_criterion(generated_image, label)        
-            Loss = lum_loss +  abs_loss
+            #abs_loss = abs_criterion(generated_image, label)        
+            #print(abs_loss.shape)
+            Loss = lum_loss# +  abs_loss
             train_acc = torch.sum(generated_image == label)
             epoch_loss += Loss.data
-
             Loss.sum().backward()
             optimizer.step()
 
@@ -156,9 +156,9 @@ if __name__ == '__main__':
             checkpointG(epoch)
 
         Accuracy = 100*train_acc / len(dataloader)
-        writer.add_scalar('loss', Loss, global_step=epoch)
+        writer.add_scalar('loss', Loss.sum(), global_step=epoch)
         writer.add_scalar('accuracy',Accuracy, global_step=epoch)
-        print("===> Epoch {} Complete: Avg. loss: {:.4f}".format(epoch, ((epoch_loss/2) / len(dataloader))))
+        print("===> Epoch {} Complete: Avg. loss: {:.4f} Accuracy {}".format(epoch, ((epoch_loss/2) / len(dataloader)), Accuracy))
 
     def print_network(net):
         num_params = 0
