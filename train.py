@@ -15,7 +15,7 @@ import itertools
 import os
 import logging
 from data_augmentation import lightmap_gen
-from criterion import luminance_criterion, abs_criterion
+from criterion import luminance_criterion, abs_criterion, color_criterion
 
 # import own dataset
 from get_data import ImageDataset
@@ -26,14 +26,14 @@ from models import NeuralNet
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='PyTorch HDRnet')
     parser.add_argument('--ray_tune', type=bool, default=False, help=("Use ray tune to tune parameters"))
-    parser.add_argument('--train_data_path', type=str, default="C:/Data/NTIRE", help=("path for the data"))
+    parser.add_argument('--train_data_path', type=str, default="C:/Data/NTIRE_test", help=("path for the data"))
     parser.add_argument('--activation', type=str, default="PReLU", help=("set activation function"))
     parser.add_argument('--imgheight', type=int, default=448, help=("set the height of the image in pixels"))
     parser.add_argument('--imgwidth', type=int, default=448, help=("set the width of the image in pixels"))
     parser.add_argument('--imgchannels', type=int, default=3, help=("set the channels of the Image (default = RGB)"))
     parser.add_argument('--augment_data', type=bool, default=False, help=("if true augment train data"))
-    parser.add_argument('--batchsize', type=int, default=1, help=("set batch Size"))
-    parser.add_argument('--gpu_mode', type=bool, default=False) 
+    parser.add_argument('--batchsize', type=int, default=4, help=("set batch Size"))
+    parser.add_argument('--gpu_mode', type=bool, default=True) 
     parser.add_argument('--threads', type=int, default=0, help='number of threads for data loader to use')
     parser.add_argument('--seed', type=int, default=123, help='random seed to use. Default=123')
     parser.add_argument('--save_folder', default='weights/', help='Location to save checkpoint models')
@@ -41,11 +41,11 @@ if __name__ == '__main__':
     parser.add_argument('--sample_interval',type=int, default=100, help='Number of epochs for learning rate decay')
     parser.add_argument('--resume',type=bool, default=False, help='resume training/ load checkpoint')
     parser.add_argument('--model_type', type=str, default="HDR", help="set type of model")
-    parser.add_argument('--filters', type=int, default=16, help="set number of filters")
+    parser.add_argument('--filters', type=int, default=64, help="set number of filters")
     parser.add_argument('--beta1',type=float, default=0.9, help='decay of first order momentum of gradient')
     parser.add_argument('--beta2',type=float, default=0.999, help='decay of first order momentum of gradient')
     parser.add_argument('--gpus', type=int, default=1, help='number of gpus')
-    parser.add_argument('--nEpochs', type=int, default=100, help='number of epochs')
+    parser.add_argument('--nEpochs', type=int, default=2000, help='number of epochs')
     parser.add_argument('--lr', type=float, default=0.0004, help="learning rate")
     parser.add_argument('--snapshots', type=int, default=10, help="number of epochs until a checkpoint is made")
     parser.add_argument('--loss_weight', type=float, default=1, help="set weight for loss addition")
@@ -104,7 +104,7 @@ if __name__ == '__main__':
         print("last checkpoint restored")
 
     def checkpointG(epoch):
-        model_out_path = opt.save_folder+opt.activation+opt.model_type+".pth".format(epoch)
+        model_out_path = opt.save_folder+str(epoch)+opt.model_type+".pth".format(epoch)
         torch.save(Net.state_dict(), model_out_path)
         print("Checkpoint saved to {}".format(model_out_path))
 
@@ -138,9 +138,10 @@ if __name__ == '__main__':
             generated_image = Net(img, lightmap)
 
             lum_loss = luminance_criterion(generated_image, label)    
-            #abs_loss = abs_criterion(generated_image, label)        
-            #print(abs_loss.shape)
-            Loss = lum_loss# +  abs_loss
+            abs_loss = abs_criterion(generated_image, label)      
+            color_loss = color_criterion(generated_image, label)  
+
+            Loss = lum_loss * 0.1 +  abs_loss.mean() + color_loss
             train_acc = torch.sum(generated_image == label)
             epoch_loss += Loss.data
             Loss.sum().backward()
