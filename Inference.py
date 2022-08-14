@@ -9,9 +9,9 @@ import torchvision
 
 
 parser = argparse.ArgumentParser(description='PyTorch ESRGANplus')
-parser.add_argument('--modelpath', type=str, default="weights/1499HDR.pth", help=("path to the model .pth files"))
+parser.add_argument('--modelpath', type=str, default="weights/119HDR.pth", help=("path to the model .pth files"))
 parser.add_argument('--inferencepath', type=str, default='C:/Users/Redmi/Downloads/', help=("Path to image folder"))
-parser.add_argument('--imagename', type=str, default='test.png', help=("filename of the image"))
+parser.add_argument('--imagename', type=str, default='test2.png', help=("filename of the image"))
 parser.add_argument('--gpu_mode', type=bool, default=True, help=('enable cuda'))
 parser.add_argument('--channels',type=int, default=3, help='number of channels R,G,B for img / number of input dimensions 3 times 2dConv for img')
 parser.add_argument('--filters',type=int, default=64, help='number of filters')
@@ -36,6 +36,8 @@ lightmap = lightmap.unsqueeze(0)
 
 image= image.to(torch.float32)
 lightmap = lightmap.to(torch.float32)
+
+print(image.size())
 
 model=NeuralNet(3, "PReLU", opt.filters)
 

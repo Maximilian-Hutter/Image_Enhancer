@@ -1,6 +1,8 @@
-import os 
+import os
+import random
 from PIL import Image
 import numpy as np
+
 path ="C:/Data/NTIRE_unprocessed/"
 
 
@@ -10,7 +12,7 @@ if __name__ == '__main__':
     for count, i in enumerate(files):
         for string in substring:
             if not(string in i):
-    
+                
                 if "gt" in i:
                     img = Image.open(path + i, "r")
                     img.save("C:/Data/NTIRE_test/label/" + i)

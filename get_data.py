@@ -39,7 +39,7 @@ class ImageDataset(Dataset):
         b,g,r = label.split()
         label = Image.merge("RGB", (r, g, b))
         img = image.resize((SMALL_SIZE, SMALL_SIZE))
-        label = label.resize((SIZE,SIZE))
+        label = label.resize((448,448))
         
         transform = transforms.Compose([
         transforms.PILToTensor()

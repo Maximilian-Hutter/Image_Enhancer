@@ -16,6 +16,7 @@ import os
 import logging
 from data_augmentation import lightmap_gen
 from criterion import luminance_criterion, abs_criterion, color_criterion
+import tqdm
 
 # import own dataset
 from get_data import ImageDataset
@@ -26,7 +27,9 @@ from models import NeuralNet
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='PyTorch HDRnet')
     parser.add_argument('--ray_tune', type=bool, default=False, help=("Use ray tune to tune parameters"))
-    parser.add_argument('--train_data_path', type=str, default="C:/Data/NTIRE_test", help=("path for the data"))
+    parser.add_argument('--train_data_path', type=str, default="C:/Data/NTIRE", help=("path for the data"))
+    parser.add_argument('--valid_data_path', type=str, default="C:/Data/NTIRE/valid", help=("path for the data"))
+    parser.add_argument('--valid_intervall', type=int, default=20, help=("intervall for validation loop"))
     parser.add_argument('--activation', type=str, default="PReLU", help=("set activation function"))
     parser.add_argument('--imgheight', type=int, default=448, help=("set the height of the image in pixels"))
     parser.add_argument('--imgwidth', type=int, default=448, help=("set the width of the image in pixels"))
@@ -45,7 +48,7 @@ if __name__ == '__main__':
     parser.add_argument('--beta1',type=float, default=0.9, help='decay of first order momentum of gradient')
     parser.add_argument('--beta2',type=float, default=0.999, help='decay of first order momentum of gradient')
     parser.add_argument('--gpus', type=int, default=1, help='number of gpus')
-    parser.add_argument('--nEpochs', type=int, default=2000, help='number of epochs')
+    parser.add_argument('--nEpochs', type=int, default=250, help='number of epochs')
     parser.add_argument('--lr', type=float, default=0.0004, help="learning rate")
     parser.add_argument('--snapshots', type=int, default=10, help="number of epochs until a checkpoint is made")
     parser.add_argument('--loss_weight', type=float, default=1, help="set weight for loss addition")
@@ -62,6 +65,7 @@ if __name__ == '__main__':
     # dataloader
     print('==> Loading Datasets')
     dataloader = DataLoader(ImageDataset(opt.train_data_path, opt.augment_data), batch_size=opt.batchsize, shuffle=True, num_workers=opt.threads)
+    #testloader = DataLoader(ImageDataset(opt.valid_data_path, opt.augment_data), batch_size=opt.batchsize, shuffle=True, num_workers=opt.threads)
 
     # instantiate model
 
@@ -76,6 +80,7 @@ if __name__ == '__main__':
     #adverserial_criterion = torch.nn.BCEWithLogitsLoss()
     #abs_crit = abs_criterion()
     #lum_crit = luminance_criterion()
+    mse = MSELoss(reduction="sum")
 
     # run on gpu
     cuda = opt.gpu_mode
@@ -88,6 +93,7 @@ if __name__ == '__main__':
 
     if cuda:
         Net = Net.cuda(gpus_list[0])
+        mse = mse.cuda(gpus_list[0])
         #abs_crit = abs_crit.cuda(gpus_list[0])
         #lum_crit = lum_crit.cuda(gpus_list[0])
 
@@ -123,7 +129,7 @@ if __name__ == '__main__':
 
             img = Variable(imgs["img"].type(Tensor))
             lightmap = Variable(imgs["lightmap"].type(Tensor))
-            label = Variable(imgs["label"].type(Tensor))    # merge depth and image to RGBD form
+            label = Variable(imgs["label"].type(Tensor))
 
             if cuda:    # put variables to gpu
                 img = img.to(gpus_list[0])
@@ -137,11 +143,14 @@ if __name__ == '__main__':
 
             generated_image = Net(img, lightmap)
 
-            lum_loss = luminance_criterion(generated_image, label)    
-            abs_loss = abs_criterion(generated_image, label)      
-            color_loss = color_criterion(generated_image, label)  
+            #lum_loss = luminance_criterion(generated_image, label)    
+            #abs_loss = abs_criterion(generated_image, label)      
+            #color_loss = color_criterion(generated_image, label)  
 
-            Loss = lum_loss * 0.1 +  abs_loss.mean() + color_loss
+            #Loss = lum_loss +  abs_loss.mean() + color_loss
+            #Loss = abs_loss.mean()
+            Loss = mse(generated_image, label)
+            #Loss = lum_loss
             train_acc = torch.sum(generated_image == label)
             epoch_loss += Loss.data
             Loss.sum().backward()
@@ -151,8 +160,50 @@ if __name__ == '__main__':
             process_time = time.time() - start_time
             print("process time: {}, Number of Iteration {}/{}".format(process_time,i , (len(dataloader)-1)))
             #pbar.set_description("Compute efficiency. {:.2f}, epoch: {}/{}".format(process_time/(process_time+prepare_time),epoch, opt.epoch))
+            
+            # if epoch % opt.valid_intervall == 0:
+            #     test()
+            
             start_time = time.time()
 
+        # def test():
+        #     Net.eval()
+        #     correct=0
+        #     total=0
+
+        #     with torch.no_grad():
+        #         for imgs in tqdm(testloader):
+
+        #             if cuda:
+        #                 img = Variable(imgs["img"].type(Tensor)).to(gpus_list[0])
+        #                 lightmap = Variable(imgs["lightmap"].type(Tensor)).to(gpus_list[0])
+        #                 label = Variable(imgs["label"].type(Tensor)).to(gpus_list[0])
+        #             else:
+        #                 label = Variable(imgs["label"].type(Tensor))
+        #                 lightmap = Variable(imgs["lightmap"].type(Tensor))
+        #                 img = Variable(imgs["img"].type(Tensor))
+
+        #             outputs=Net(img, lightmap)
+
+        #             lum_loss = luminance_criterion(generated_image, label)    
+        #             abs_loss = abs_criterion(generated_image, label)      
+        #             color_loss = color_criterion(generated_image, label)  
+
+        #             loss = lum_loss +  abs_loss.mean() + color_loss
+
+        #             predicted = outputs
+                    
+        #             total += label.size(0)
+        #             correct += predicted.eq(label).sum().item()
+
+        #     accu=100.*correct/total
+
+        #     valid_loss = loss.item() * img.size(0)
+
+        #     print('Test Loss: %.3f | Accuracy: %.3f'%(valid_loss, accu)) 
+
+
+        
         if (epoch+1) % (opt.snapshots) == 0:
             checkpointG(epoch)
 
