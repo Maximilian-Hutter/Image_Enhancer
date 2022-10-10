@@ -42,7 +42,7 @@ class ImageDataset(Dataset):
         label = label.resize((SIZE,SIZE))
         
         transform = transforms.Compose([
-        transforms.PILToTensor()
+        transforms.ToTensor()
         ])
 
         lightmap = lightmap_gen(img)
